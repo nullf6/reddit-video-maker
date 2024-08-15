@@ -43,7 +43,7 @@ def create_tiktok_clip(
 
     if background_video.duration > total_duration:
         start_time = random.uniform(0, background_video.duration - total_duration)
-        background_video = background_video.subclip(start_time, start_time + total_duration)
+        background_video = background_video.subclip(start_time, start_time + total_duration+2)
     else:
         background_video = background_video.subclip(0, total_duration)
 
@@ -57,14 +57,15 @@ def create_tiktok_clip(
     # Generate the overlay image clip and adjust the size
     overlay_image = ImageClip(overlay_image_path)
     overlay_image = overlay_image.set_duration(voice1.duration)
-    overlay_image = overlay_image.resize(height=80).set_position("center")  # Adjust the height to fit better
+    overlay_image = overlay_image.resize(height=210).set_position("center")  # Adjust the height to fit better
 
     # Create the intro clip with voice1 and the expanding overlay image
     intro_clip = CompositeVideoClip([background_video, overlay_image])
     intro_clip = intro_clip.set_audio(voice1).subclip(0, voice1.duration)
 
     # Create the main clip with voice2 and the background video
-    main_clip = background_video.set_audio(voice2).subclip(0, voice2.duration)
+    main_clip = background_video.subclip(voice1.duration, voice2.duration)
+    main_clip.audio = voice2
 
     # Concatenate the intro and main clips
     final_clip = concatenate_videoclips([intro_clip, main_clip])
@@ -77,12 +78,12 @@ def create_tiktok_clip(
     final_clip = final_clip.set_audio(final_audio)
 
     # Output the final clip with high quality
-    final_clip.write_videofile(output_path, codec="libx264", fps=24, bitrate="3000k", audio_codec="aac")
+    final_clip.write_videofile(output_path, codec="libx264", fps=24)
 
 url = input("Enter the post url: ")
 post_title = fetch_data.getSubmissionTitle(url)
 post_body = fetch_data.getSubmissionBody(url)
-background_video_path = "../data/background_video.mp4"
+background_video_path = "../data/background_video.webm"
 background_music_path = "../data/background_music/moments.m4a"
 voice1_path = generate_voice.getTextAudio("example1", post_title)
 voice2_path = generate_voice.getTextAudio("example2", post_body)
