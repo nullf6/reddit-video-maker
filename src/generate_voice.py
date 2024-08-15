@@ -2,7 +2,7 @@ from elevenlabs.client import ElevenLabs
 import elevenlabs
 
 client = ElevenLabs(
-        api_key="19383af207ac93a828db987d90c51056"
+        api_key="1c2c4ff62affa70dcd3aef0f5bf63d9e"
 )
 
 def getTextAudio(filename, text):

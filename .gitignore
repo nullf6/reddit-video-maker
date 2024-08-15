@@ -2,3 +2,4 @@ test/
 Pip*
 data/misc/
 data/background_video.mp4
+.env*
