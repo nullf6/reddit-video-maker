@@ -50,6 +50,10 @@ def get_text_clips(text):
             start_time = word_group[0]["start"]
             end_time = word_group[-1]["end"]
 
+            # Bounce effect for the text
+            def bounce(t):
+                return 1.1 + 0.1 * (1 - (t / 0.1)**2) if t <= 0.1 else 1
+
             text_clips_array.append(
                 TextClip(
                     text,
@@ -61,11 +65,11 @@ def get_text_clips(text):
                 ).set_start(start_time)
                 .set_end(end_time)
                 .set_position("center")
+                .resize(lambda t: bounce(t))  # Apply bounce effect here
             )
             i += 3
 
     return text_clips_array
-
 
 def create_tiktok_clip(
     background_video_path,
