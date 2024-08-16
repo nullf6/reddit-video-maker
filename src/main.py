@@ -3,22 +3,36 @@ from moviepy.editor import (
     concatenate_videoclips,
     VideoFileClip,
     CompositeVideoClip,
-    TextClip,
     AudioFileClip,
     ImageClip,
-    concatenate_videoclips,
-    concatenate_audioclips,
     afx
 )
-from moviepy.video.fx.resize import resize
-from moviepy.video.fx.fadein import fadein
-from moviepy.video.fx.fadeout import fadeout
+from moviepy.video.fx.all import crop
 import generate_voice
 import fetch_data
 import create_box
 import random
-import cv2
-from moviepy.video.fx.all import crop
+from PIL import Image, ImageDraw
+
+def create_masked_overlay(image_path, output_path, corner_radius=20, new_size=None):
+    """Create a mask for the image to keep the blacks opaque and round the corners, with optional resizing."""
+    image = Image.open(image_path).convert("RGBA")
+
+    if new_size:
+        image = image.resize(new_size, Image.Resampling.LANCZOS)  # Updated to use LANCZOS
+
+    width, height = image.size
+
+    # Create a rounded rectangle mask
+    mask = Image.new("L", (width, height), 0)
+    draw = ImageDraw.Draw(mask)
+    draw.rounded_rectangle(
+        [(0, 0), (width, height)], corner_radius, fill=255
+    )
+
+    # Apply the mask to the alpha channel
+    image.putalpha(mask)
+    image.save(output_path)
 
 def create_tiktok_clip(
     background_video_path,
@@ -27,10 +41,11 @@ def create_tiktok_clip(
     voice2_path,
     overlay_image_path,
     output_path,
+    overlay_size=None,
+    animation_rate=0.4,
 ):
     # Load media files
     background_video = VideoFileClip(background_video_path)
-
     background_music = AudioFileClip(background_music_path)
     voice1 = AudioFileClip(voice1_path)
     voice2 = AudioFileClip(voice2_path)
@@ -39,33 +54,41 @@ def create_tiktok_clip(
     total_duration = voice1.duration + voice2.duration
 
     # Load the background video and select a random subclip
-    background_video = VideoFileClip(background_video_path)
-
     if background_video.duration > total_duration:
         start_time = random.uniform(0, background_video.duration - total_duration)
-        background_video = background_video.subclip(start_time, start_time + total_duration+2)
+        background_video = background_video.subclip(start_time, start_time + total_duration + 2)
     else:
         background_video = background_video.subclip(0, total_duration)
 
-    # Cropping background video to 9:16 aspect ratio (TikTok's aspect ratio)
+    # Crop the background video to 9:16 aspect ratio (TikTok's aspect ratio)
     (w, h) = background_video.size
-    crop_width = h * 9/16
-    x1, x2 = (w - crop_width)//2, (w + crop_width)//2
+    crop_width = h * 9 / 16
+    x1, x2 = (w - crop_width) // 2, (w + crop_width) // 2
     y1, y2 = 0, h
     background_video = crop(background_video, x1=x1, y1=y1, x2=x2, y2=y2)
 
-    # Generate the overlay image clip and adjust the size
-    overlay_image = ImageClip(overlay_image_path)
-    overlay_image = overlay_image.set_duration(voice1.duration)
-    overlay_image = overlay_image.resize(height=210).set_position("center")  # Adjust the height to fit better
+    # Prepare the masked overlay image
+    masked_overlay_path = "masked_overlay.png"
+    create_masked_overlay(overlay_image_path, masked_overlay_path, new_size=overlay_size)
+
+    # Load and resize the overlay image
+    overlay_image = ImageClip(masked_overlay_path).set_duration(voice1.duration)
+
+    # Create a function to animate the size change from 95% to 100% over the specified animation rate
+    def resize_func(t):
+        scale = 0.95 + 0.05 * min(1, t / animation_rate)  # Linear scale from 0.95 to 1.0
+        return overlay_image.size[0] * scale, overlay_image.size[1] * scale
+
+    # Apply the resizing function and center the image
+    overlay_image = overlay_image.resize(resize_func).set_position("center")
 
     # Create the intro clip with voice1 and the expanding overlay image
     intro_clip = CompositeVideoClip([background_video, overlay_image])
     intro_clip = intro_clip.set_audio(voice1).subclip(0, voice1.duration)
 
     # Create the main clip with voice2 and the background video
-    main_clip = background_video.subclip(voice1.duration, voice2.duration)
-    main_clip.audio = voice2
+    main_clip = background_video.subclip(voice1.duration, total_duration)
+    main_clip = main_clip.set_audio(voice2)
 
     # Concatenate the intro and main clips
     final_clip = concatenate_videoclips([intro_clip, main_clip])
@@ -80,15 +103,18 @@ def create_tiktok_clip(
     # Output the final clip with high quality
     final_clip.write_videofile(output_path, codec="libx264", fps=24)
 
-url = input("Enter the post url: ")
+# Example usage
+url = input("Enter the post URL: ")
 post_title = fetch_data.getSubmissionTitle(url)
 post_body = fetch_data.getSubmissionBody(url)
 background_video_path = "../data/background_video.webm"
 background_music_path = "../data/background_music/moments.m4a"
-voice1_path = generate_voice.getTextAudio("example1", post_title)
-voice2_path = generate_voice.getTextAudio("example2", post_body)
+voice1_path = '../data/text_audio/example1.mp3'
+voice2_path = '../data/text_audio/example1.mp3'
 overlay_image_path = create_box.create_text_image_with_overlay(post_title, 20, "../data/logo.png", "lol.png")
 output_path = "tiktok_video.mp4"
+overlay_size = (600,156)  # Example size for resizing
+animation_rate = 0.1  # Example animation rate
 
 create_tiktok_clip(
     background_video_path,
@@ -97,4 +123,6 @@ create_tiktok_clip(
     voice2_path,
     overlay_image_path,
     output_path,
+    overlay_size=overlay_size,
+    animation_rate=animation_rate,
 )
