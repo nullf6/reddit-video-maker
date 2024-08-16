@@ -5,8 +5,10 @@ from moviepy.editor import (
     CompositeVideoClip,
     AudioFileClip,
     ImageClip,
+    TextClip,
     afx
 )
+import whisper_timestamped as whisper
 from moviepy.video.fx.all import crop
 import generate_voice
 import fetch_data
@@ -34,6 +36,37 @@ def create_masked_overlay(image_path, output_path, corner_radius=20, new_size=No
     image.putalpha(mask)
     image.save(output_path)
 
+def get_text_clips(text):
+    text_clips_array = []
+    segments = text["segments"]
+
+    for segment in segments:
+        words = segment["words"]
+        i = 0
+        while i < len(words):
+            # Group up to 3 words together
+            word_group = words[i:i+3]
+            text = " ".join([word["text"] for word in word_group])
+            start_time = word_group[0]["start"]
+            end_time = word_group[-1]["end"]
+
+            text_clips_array.append(
+                TextClip(
+                    text,
+                    fontsize=50,
+                    stroke_color="Black",
+                    color="White",
+                    stroke_width=1,
+                    font="Barlow-ExtraBold"
+                ).set_start(start_time)
+                .set_end(end_time)
+                .set_position("center")
+            )
+            i += 3
+
+    return text_clips_array
+
+
 def create_tiktok_clip(
     background_video_path,
     background_music_path,
@@ -49,6 +82,8 @@ def create_tiktok_clip(
     background_music = AudioFileClip(background_music_path)
     voice1 = AudioFileClip(voice1_path)
     voice2 = AudioFileClip(voice2_path)
+    model = whisper.load_model("small", device="cpu")
+    transcribed_text = whisper.transcribe(model, voice2_path, language='en')
 
     # Calculate total duration (intro + main clip)
     total_duration = voice1.duration + voice2.duration
@@ -86,8 +121,12 @@ def create_tiktok_clip(
     intro_clip = CompositeVideoClip([background_video, overlay_image])
     intro_clip = intro_clip.set_audio(voice1).subclip(0, voice1.duration)
 
+    # generating text clips and audio clip for intro
+    text_clips = get_text_clips(transcribed_text)
+
     # Create the main clip with voice2 and the background video
-    main_clip = background_video.subclip(voice1.duration, total_duration)
+    main_background = background_video.subclip(voice1.duration, total_duration)
+    main_clip = CompositeVideoClip([main_background] + text_clips)
     main_clip = main_clip.set_audio(voice2)
 
     # Concatenate the intro and main clips
@@ -110,7 +149,7 @@ post_body = fetch_data.getSubmissionBody(url)
 background_video_path = "../data/background_video.webm"
 background_music_path = "../data/background_music/moments.m4a"
 voice1_path = '../data/text_audio/example1.mp3'
-voice2_path = '../data/text_audio/example1.mp3'
+voice2_path = '../data/text_audio/example2.mp3'
 overlay_image_path = create_box.create_text_image_with_overlay(post_title, 20, "../data/logo.png", "lol.png")
 output_path = "tiktok_video.mp4"
 overlay_size = (600,156)  # Example size for resizing
