@@ -12,7 +12,7 @@ def create_text_image_with_overlay(text, font_size, overlay_image_path, output_p
 
     # Load a font with the given font size
     try:
-        font = ImageFont.truetype("ArchivoBlack-Regular.ttf", font_size)
+        font = ImageFont.truetype("Montserrat-ExtraBold", font_size)
     except IOError:
         font = ImageFont.load_default()
         print("Default font is being used, and it may not respect the font size.")
@@ -67,4 +67,4 @@ def create_text_image_with_overlay(text, font_size, overlay_image_path, output_p
 
     # Save the image
     img.save(output_path)
-    return(output_path)
+    return (output_path, height)

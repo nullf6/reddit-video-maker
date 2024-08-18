@@ -6,7 +6,8 @@ from moviepy.editor import (
     AudioFileClip,
     ImageClip,
     TextClip,
-    afx
+    afx,
+    vfx
 )
 import whisper_timestamped as whisper
 from moviepy.video.fx.all import crop
@@ -45,29 +46,47 @@ def get_text_clips(text):
         i = 0
         while i < len(words):
             # Group up to 3 words together
-            word_group = words[i:i+3]
+            word_group = words[i:i+2]
             text = " ".join([word["text"] for word in word_group])
             start_time = word_group[0]["start"]
             end_time = word_group[-1]["end"]
 
-            # Bounce effect for the text
+            # Create the shadow clip
+            shadow_clip = TextClip(
+                text,
+                font="Montserrat-ExtraBold",
+                fontsize=70,
+                color="black",
+                stroke_color="black",
+                stroke_width=10,       # Increase stroke width for a larger shadow
+            ).set_start(start_time).set_end(end_time)
+
+            # Apply a supersample effect to simulate a blur
+            shadow_clip = shadow_clip.fx(vfx.supersample, d=1.5, nframes=3)
+
+            # Create the main text clip
+            text_clip = TextClip(
+                text,
+                font="Montserrat-ExtraBold",
+                fontsize=70,
+                color="white",
+            ).set_start(start_time).set_end(end_time)
+
+            # Define the bounce effect function
             def bounce(t):
+                """Bounce effect function for scaling."""
                 return 1.1 + 0.1 * (1 - (t / 0.1)**2) if t <= 0.1 else 1
 
-            text_clips_array.append(
-                TextClip(
-                    text,
-                    fontsize=50,
-                    stroke_color="Black",
-                    color="White",
-                    stroke_width=1,
-                    font="Barlow-ExtraBold"
-                ).set_start(start_time)
-                .set_end(end_time)
-                .set_position("center")
-                .resize(lambda t: bounce(t))  # Apply bounce effect here
-            )
-            i += 3
+            # Apply the bounce effect to both the shadow and text clips
+            shadow_clip = shadow_clip.resize(lambda t: bounce(t)).set_position('center')
+            text_clip = text_clip.resize(lambda t: bounce(t)).set_position('center')
+
+            final_text_clip = CompositeVideoClip([shadow_clip, text_clip])
+            final_text_clip = final_text_clip.set_position("center","center")
+            text_clips_array.append(final_text_clip)
+
+
+            i += 2
 
     return text_clips_array
 
@@ -144,7 +163,7 @@ def create_tiktok_clip(
     final_clip = final_clip.set_audio(final_audio)
 
     # Output the final clip with high quality
-    final_clip.write_videofile(output_path, codec="libx264", fps=24)
+    final_clip.write_videofile(output_path, codec="libx264", fps=60)
 
 # Example usage
 url = input("Enter the post URL: ")
@@ -152,11 +171,13 @@ post_title = fetch_data.getSubmissionTitle(url)
 post_body = fetch_data.getSubmissionBody(url)
 background_video_path = "../data/background_video.webm"
 background_music_path = "../data/background_music/moments.m4a"
-voice1_path = '../data/text_audio/example1.mp3'
-voice2_path = '../data/text_audio/example2.mp3'
+voice1_path = generate_voice.getTextAudio('example1.mp3', post_title)
+voice2_path = generate_voice.getTextAudio('example2.mp3', post_body)
+# voice1_path = '../data/text_audio/example1.mp3'
+# voice2_path = '../data/text_audio/example2.mp3'
 overlay_image_path = create_box.create_text_image_with_overlay(post_title, 20, "../data/logo.png", "lol.png")
-output_path = "tiktok_video.mp4"
-overlay_size = (600,156)  # Example size for resizing
+output_path = "tiktok2_video.mp4"
+overlay_size = (500,overlay_image_path[1])  # Example size for resizing
 animation_rate = 0.1  # Example animation rate
 
 create_tiktok_clip(
@@ -164,7 +185,7 @@ create_tiktok_clip(
     background_music_path,
     voice1_path,
     voice2_path,
-    overlay_image_path,
+    overlay_image_path[0],
     output_path,
     overlay_size=overlay_size,
     animation_rate=animation_rate,

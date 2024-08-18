@@ -4,5 +4,6 @@
 - [X] add bounce effect for text clips
 - [X] add smooth enlarge effect for the image clip
 - [X] fix video quality
-- [ ] improve font
+- [X] improve font
+- [ ] add real shadow instead of upping the strokes
 - [ ] implement menu so we can input as many url as required
