@@ -6,4 +6,4 @@
 - [X] fix video quality
 - [X] improve font
 - [ ] add real shadow instead of upping the strokes
-- [ ] implement menu so we can input as many url as required
+- [X] implement menu so we can input as many url as required

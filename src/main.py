@@ -1,3 +1,5 @@
+import os
+import json
 from moviepy.editor import (
     CompositeAudioClip,
     concatenate_videoclips,
@@ -11,18 +13,42 @@ from moviepy.editor import (
 )
 import whisper_timestamped as whisper
 from moviepy.video.fx.all import crop
-import generate_voice
+# import generate_voice
 import fetch_data
 import create_box
 import random
 from PIL import Image, ImageDraw
+from tiktokvoice import tts
+
+# Paths to store the metadata
+FINISHED_VIDEOS_PATH = "../data/finished_vids/finished_videos.json"
+AUDIO_FILES_PATH = "../data/finished_vids/audio_files.json"
+
+# Ensure the finished_vids directory exists
+os.makedirs("../data/finished_vids", exist_ok=True)
+
+def load_json(filepath):
+    """Load JSON data from a file, or return an empty dictionary if the file doesn't exist."""
+    if os.path.exists(filepath):
+        with open(filepath, "r") as file:
+            return json.load(file)
+    return {}
+
+def save_json(filepath, data):
+    """Save JSON data to a file."""
+    with open(filepath, "w") as file:
+        json.dump(data, file, indent=4)
+
+# Load existing data
+finished_videos = load_json(FINISHED_VIDEOS_PATH)
+audio_files = load_json(AUDIO_FILES_PATH)
 
 def create_masked_overlay(image_path, output_path, corner_radius=20, new_size=None):
     """Create a mask for the image to keep the blacks opaque and round the corners, with optional resizing."""
     image = Image.open(image_path).convert("RGBA")
 
     if new_size:
-        image = image.resize(new_size, Image.Resampling.LANCZOS)  # Updated to use LANCZOS
+        image = image.resize(new_size, Image.Resampling.LANCZOS)
 
     width, height = image.size
 
@@ -45,7 +71,7 @@ def get_text_clips(text):
         words = segment["words"]
         i = 0
         while i < len(words):
-            # Group up to 3 words together
+            # Group up to 2 words together
             word_group = words[i:i+2]
             text = " ".join([word["text"] for word in word_group])
             start_time = word_group[0]["start"]
@@ -85,7 +111,6 @@ def get_text_clips(text):
             final_text_clip = final_text_clip.set_position("center","center")
             text_clips_array.append(final_text_clip)
 
-
             i += 2
 
     return text_clips_array
@@ -99,6 +124,9 @@ def create_tiktok_clip(
     output_path,
     overlay_size=None,
     animation_rate=0.4,
+    url=None,
+    post_title=None,
+    post_body=None,
 ):
     # Load media files
     background_video = VideoFileClip(background_video_path)
@@ -134,7 +162,7 @@ def create_tiktok_clip(
 
     # Create a function to animate the size change from 95% to 100% over the specified animation rate
     def resize_func(t):
-        scale = 0.95 + 0.05 * min(1, t / animation_rate)  # Linear scale from 0.95 to 1.0
+        scale = 0.95 + 0.05 * min(1, t / animation_rate)
         return overlay_image.size[0] * scale, overlay_image.size[1] * scale
 
     # Apply the resizing function and center the image
@@ -159,34 +187,73 @@ def create_tiktok_clip(
     background_music = afx.audio_loop(background_music, duration=total_duration)
 
     # Set background music to play throughout the video
-    final_audio = CompositeAudioClip([background_music.volumex(0.5), final_clip.audio])
+    final_audio = CompositeAudioClip([background_music.volumex(0.3), final_clip.audio])
     final_clip = final_clip.set_audio(final_audio)
 
     # Output the final clip with high quality
     final_clip.write_videofile(output_path, codec="libx264", fps=60)
 
-# Example usage
-url = input("Enter the post URL: ")
-post_title = fetch_data.getSubmissionTitle(url)
-post_body = fetch_data.getSubmissionBody(url)
-background_video_path = "../data/background_video.webm"
-background_music_path = "../data/background_music/moments.m4a"
-voice1_path = generate_voice.getTextAudio('example1.mp3', post_title)
-voice2_path = generate_voice.getTextAudio('example2.mp3', post_body)
-# voice1_path = '../data/text_audio/example1.mp3'
-# voice2_path = '../data/text_audio/example2.mp3'
-overlay_image_path = create_box.create_text_image_with_overlay(post_title, 20, "../data/logo.png", "lol.png")
-output_path = "tiktok2_video.mp4"
-overlay_size = (500,overlay_image_path[1])  # Example size for resizing
-animation_rate = 0.1  # Example animation rate
+    # Update the finished videos and audio files records
+    finished_videos[output_path] = {"url": url, "title": post_title, "output": output_path}
+    audio_files[voice1_path] = post_title
+    audio_files[voice2_path] = post_body
 
-create_tiktok_clip(
-    background_video_path,
-    background_music_path,
-    voice1_path,
-    voice2_path,
-    overlay_image_path[0],
-    output_path,
-    overlay_size=overlay_size,
-    animation_rate=animation_rate,
-)
+    # Save the updated data
+    save_json(FINISHED_VIDEOS_PATH, finished_videos)
+    save_json(AUDIO_FILES_PATH, audio_files)
+
+def main():
+    urls = []
+    while True:
+        url = input("Enter the post URL (or type 'done' to finish): ")
+        if url.lower() == 'done':
+            break
+        urls.append(url)
+
+    background_video_path = "../data/background_video.webm"
+    music_choice = {
+        1: "../data/background_music/undertale.m4a",
+        2: "../data/background_music/remix.m4a",
+        3: "../data/background_music/undertale_shop.m4a",
+        4: "../data/background_music/solitude.m4a",
+        5: "../data/background_music/israel.m4a",
+        6: "../data/background_music/up_theme.mp3"
+    }
+
+    try:
+        choice = int(input("Choose your music. \n1. Undertale \n2. Remix \n3. Undertale Shop \n4. M83 - Solitude \n5. Israel\n6. Up Theme song \nEnter your input: "))
+        background_music_path = music_choice.get(choice, "Invalid option, please select a valid option")
+    except ValueError:
+        print("Invalid input. Please enter a number.")
+        return
+
+    for i, url in enumerate(urls):
+        post_title = fetch_data.getSubmissionTitle(url)
+        post_body = fetch_data.getSubmissionBody(url)
+        # voice1_path = generate_voice.getTextAudio(f'example1_{i}.mp3', post_title)
+        # voice2_path = generate_voice.getTextAudio(f'example2_{i}.mp3', post_body)
+        print("generating title voice..")
+        voice1_path = tts(post_title, "en_us_010", f"../data/text_audio/postVoice_{i}.mp3")
+        voice2_path = tts(post_body, "en_us_010", f"../data/text_audio/bodyVoice_{i}.mp3")
+        print("generating body voice..")
+        overlay_image_path = create_box.create_text_image_with_overlay(post_title, 20, "../data/logo.png", f"lol_{i}.png")
+        output_path = f"tiktok2_video_{i}.mp4"
+        overlay_size = (round(500*1.2), round(overlay_image_path[1]*1.2))  # Example size for resizing
+        animation_rate = 0.1  # Example animation rate
+
+        create_tiktok_clip(
+            background_video_path,
+            background_music_path,
+            voice1_path,
+            voice2_path,
+            overlay_image_path[0],
+            output_path,
+            overlay_size=overlay_size,
+            animation_rate=animation_rate,
+            url=url,
+            post_title=post_title,
+            post_body=post_body,
+        )
+
+if __name__ == "__main__":
+    main()

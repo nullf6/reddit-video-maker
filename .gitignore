@@ -1,6 +1,10 @@
 test/
 Pip*
 data/misc/
-data/background_video.mp4
+data/finished_vids/
+data/text_audio/
+data/background_video*
+data/background_video*
+src/*.mp4
 .env*
 src/*png
