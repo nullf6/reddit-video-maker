@@ -19,6 +19,15 @@ import create_box
 import random
 from PIL import Image, ImageDraw
 from tiktokvoice import tts
+from audiostretchy.stretch import stretch_audio
+
+
+def change_voice_pacing(voice_path, speed=0.8):
+    new_path = f"{os.path.splitext(voice_path)[0]}_speed{os.path.splitext(voice_path)[1]}"
+    stretch_audio(voice_path, new_path, speed)
+    return new_path
+
+
 
 # Paths to store the metadata
 FINISHED_VIDEOS_PATH = "../data/finished_vids/finished_videos.json"
@@ -71,8 +80,8 @@ def get_text_clips(text):
         words = segment["words"]
         i = 0
         while i < len(words):
-            # Group up to 2 words together
-            word_group = words[i:i+2]
+            # Group up to 2 words together, with most instances being 1 word
+            word_group = words[i:i+2] if random.random() < 0.3 else words[i:i+1]
             text = " ".join([word["text"] for word in word_group])
             start_time = word_group[0]["start"]
             end_time = word_group[-1]["end"]
@@ -84,10 +93,9 @@ def get_text_clips(text):
                 fontsize=70,
                 color="black",
                 stroke_color="black",
-                stroke_width=10,       # Increase stroke width for a larger shadow
+                stroke_width=10,
             ).set_start(start_time).set_end(end_time)
 
-            # Apply a supersample effect to simulate a blur
             shadow_clip = shadow_clip.fx(vfx.supersample, d=1.5, nframes=3)
 
             # Create the main text clip
@@ -100,18 +108,16 @@ def get_text_clips(text):
 
             # Define the bounce effect function
             def bounce(t):
-                """Bounce effect function for scaling."""
                 return 1.1 + 0.1 * (1 - (t / 0.1)**2) if t <= 0.1 else 1
 
-            # Apply the bounce effect to both the shadow and text clips
             shadow_clip = shadow_clip.resize(lambda t: bounce(t)).set_position('center')
             text_clip = text_clip.resize(lambda t: bounce(t)).set_position('center')
 
             final_text_clip = CompositeVideoClip([shadow_clip, text_clip])
-            final_text_clip = final_text_clip.set_position("center","center")
+            final_text_clip = final_text_clip.set_position("center", "center")
             text_clips_array.append(final_text_clip)
 
-            i += 2
+            i += len(word_group)
 
     return text_clips_array
 
@@ -181,13 +187,13 @@ def create_tiktok_clip(
     main_clip = main_clip.set_audio(voice2)
 
     # Concatenate the intro and main clips
-    final_clip = concatenate_videoclips([intro_clip, main_clip])
+    final_clip = concatenate_videoclips([intro_clip, main_clip], method="compose")
 
     # Loop background music for the entire duration
     background_music = afx.audio_loop(background_music, duration=total_duration)
 
     # Set background music to play throughout the video
-    final_audio = CompositeAudioClip([background_music.volumex(0.3), final_clip.audio])
+    final_audio = CompositeAudioClip([background_music.volumex(0.1), final_clip.audio])
     final_clip = final_clip.set_audio(final_audio)
 
     # Output the final clip with high quality
@@ -210,7 +216,7 @@ def main():
             break
         urls.append(url)
 
-    background_video_path = "../data/background_video.webm"
+    background_video_path = "../data/background_video4.webm"
     music_choice = {
         1: "../data/background_music/undertale.m4a",
         2: "../data/background_music/remix.m4a",
@@ -234,7 +240,11 @@ def main():
         # voice2_path = generate_voice.getTextAudio(f'example2_{i}.mp3', post_body)
         print("generating title voice..")
         voice1_path = tts(post_title, "en_us_010", f"../data/text_audio/postVoice_{i}.mp3")
+        # voice2_path = tts(post_body, "en_us_010", f"../data/text_audio/bodyVoice_{i}.mp3")
+        # voice1_path = tts(post_title, "en_us_010", f"../data/text_audio/postVoice_{i}.mp3")
+        # change_voice_pacing(voice1_path, speed=1.5)
         voice2_path = tts(post_body, "en_us_010", f"../data/text_audio/bodyVoice_{i}.mp3")
+        voice2_path = change_voice_pacing(voice2_path, speed=0.8)
         print("generating body voice..")
         overlay_image_path = create_box.create_text_image_with_overlay(post_title, 20, "../data/logo.png", f"lol_{i}.png")
         output_path = f"tiktok2_video_{i}.mp4"

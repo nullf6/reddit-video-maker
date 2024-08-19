@@ -6,4 +6,6 @@
 - [X] fix video quality
 - [X] improve font
 - [ ] add real shadow instead of upping the strokes
+- [ ] add swoosh sound effect
+- [X] improve cadence of voice
 - [X] implement menu so we can input as many url as required
