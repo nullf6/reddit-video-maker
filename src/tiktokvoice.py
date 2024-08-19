@@ -5,7 +5,6 @@
 
 import requests, base64, re, sys
 from threading import Thread
-from playsound import playsound
 
 # define the endpoint data with URLs and corresponding response keys
 ENDPOINT_DATA = [
@@ -141,10 +140,6 @@ def tts(text: str, voice: str, output_filename: str = "output.mp3", play_sound: 
             file.write(audio_bytes)
             print(f"File '{output_filename}' has been generated successfully.")
         
-        # play the audio if specified
-        if (play_sound) :
-            playsound(output_filename)
-
         # break after processing a valid endpoint
         break
     return output_filename
