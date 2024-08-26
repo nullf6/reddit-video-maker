@@ -18,3 +18,5 @@ def getSubmissionBody(url):
     body = reddit.submission(submission_id).selftext
     return body
 
+def getSubmissionID(url):
+    return reddit.submission(url=url).id

@@ -8,3 +8,5 @@ data/background_video*
 src/*.mp4
 .env*
 src/*png
+src/main_*
+data/*.ttf
