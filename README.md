@@ -9,3 +9,4 @@
 - [ ] add swoosh sound effect
 - [X] improve cadence of voice
 - [X] implement menu so we can input as many url as required
+- [X] multi-processing
